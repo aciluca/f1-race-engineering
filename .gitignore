@@ -1,13 +1,44 @@
-# Virtual Enviroment
+# Virtual environments
+.venv/
 venv/
-/venv/
 
-# Cache folder of fastf1
-cache/
-/cache/
-
-# File System and Python
+# Python cache / compiled files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+ 
+# Build / packaging
+build/
+dist/
+*.egg-info/
+ 
+# IDE / editor folders
 .vscode/
+.idea/
+ 
+# Operating system files
 .DS_Store
+Thumbs.db
+ 
+# Environment variables / secrets
+.env
+ 
+# Logs
+*.log
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local project cache
+cache/raw/*
+cache/normalized/*
+cache/features/*
+
+# Keep empty cache folders in git
+!cache/raw/.gitkeep
+!cache/normalized/.gitk

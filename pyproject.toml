@@ -1,0 +1,31 @@
+[project]
+name = "f1-race-engineering"
+version = "0.1.0"
+description = "Desktop app for Formula 1 telemetry, strategy analysis and machine learning preparation."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "PySide6>=6.8",
+    "pyqtgraph>=0.13.7",
+    "matplotlib>=3.10",
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "requests>=2.32",
+    "python-dotenv>=1.0",
+    "pydantic>=2.10",
+    "pyarrow>=18.0",
+    "fastf1>=3.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

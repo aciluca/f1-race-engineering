@@ -1,7 +1,0 @@
-# File: f1_analyzer/config.py
-
-COMPOUND_COLORS = { 
-    'SOFT': '#FF3333', 'MEDIUM': '#FFF200', 'HARD': '#EBEBEB', 
-    'INTERMEDIATE': '#43B02A', 'WET': '#0090FF', 'UNKNOWN': '#808080' 
-}
-CANONICAL_COMPOUND_ORDER = ['SOFT', 'MEDIUM', 'HARD', 'INTERMEDIATE', 'WET']
