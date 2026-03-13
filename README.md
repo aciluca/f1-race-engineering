@@ -4,10 +4,9 @@ Desktop application in Python for Formula 1 telemetry analysis, strategy visuali
 
 ## Project Status
 
-The project is currently in **Milestone 1**
+The project is currently in **Milestone 2**
 
-Implemented so far:
-
+### Foundation completed
 - project setup with `pyproject.toml`
 - Python virtual environment workflow
 - Qt desktop application foundation with PySide6
@@ -17,6 +16,15 @@ Implemented so far:
 - `OpenF1Provider`
 - `CacheManager`
 - basic logging configuration
+
+### Weekend Explorer implemented so far
+- season, Grand Prix and session selection
+- session metadata loading
+- laps preview table
+- driver selection for telemetry comparison
+- speed trace comparison with `pyqtgraph`
+- team-based telemetry colors
+- interactive telemetry cursor with distance, speed and delta inspection
 
 ## Tech Stack
 
