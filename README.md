@@ -84,7 +84,7 @@ python -m ui.main
 
 ## Milestones
 
-### Milestone 1
+### Milestone 1 — Foundation
 - Project setup
 - Qt main window
 - Base tabs: Weekend / Strategy / ML Lab
@@ -93,6 +93,14 @@ python -m ui.main
 - OpenF1 provider
 - Cache manager
 - Logging and config
+
+### Milestone 2 — Weekend Explorer
+- season / GP / session selection
+- session metadata loading
+- laps table
+- first telemetry speed plot
+- support for driver comparison
+- lap selection
 
 ### Milestone 3 — Strategy Analysis
 - stint extraction
