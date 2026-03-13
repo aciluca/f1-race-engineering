@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from data.cache.cache_manager import CacheManager
 from data.providers.fastf1_provider import FastF1Provider
 from ui.widgets.telemetry_plot import TelemetryPlotWidget
+from ui.resources import get_team_color
 
 
 class WeekendPanel(QWidget):
@@ -105,6 +106,21 @@ class WeekendPanel(QWidget):
         self.season_combo.currentIndexChanged.connect(self._on_season_changed)
         self.load_button.clicked.connect(self._on_load_session_clicked)
         self.load_telemetry_button.clicked.connect(self._on_load_telemetry_clicked)
+    
+    def _get_driver_team(self, driver_code: str) -> str | None:
+        if self.current_laps is None or self.current_laps.empty:
+            return None
+
+        drivers_rows = self.current_laps[self.current_laps["Driver"] == driver_code]
+        
+        if drivers_rows.empty or "Team" not in drivers_rows.columns:
+            return None
+        
+        team_value = drivers_rows["Team"].dropna()
+        if team_value.empty:
+            return None
+        
+        return str(team_value.iloc[0])
         
     def _populate_seasons(self) -> None:
         seasons = [str(year) for year in range(2018, 2026)]
@@ -200,7 +216,13 @@ class WeekendPanel(QWidget):
         session_name = self.session_combo.currentText()
         driver_1 = self.driver_1_combo.currentText()
         driver_2 = self.driver_2_combo.currentText()
+        
+        team_1 = self._get_driver_team(driver_1)
+        team_1_color = get_team_color(team_1)
 
+        team_2 = self._get_driver_team(driver_2) if driver_2 else None
+        team_2_color = get_team_color(team_2) if team_2 else "#FFFFFF"
+        
         if not season_text or not gp_name or not session_name or not driver_1:
             self._show_error("Missing selection", "Please select session and at least one driver.")
             return
@@ -238,8 +260,10 @@ class WeekendPanel(QWidget):
             self.telemetry_plot.plot_speed_comparison(
                 telemetry_1=telemetry_1,
                 driver_1=driver_1,
+                team_1_color=team_1_color,
                 telemetry_2=telemetry_2,
                 driver_2=driver_2,
+                team_2_color=team_2_color,
             )
 
         except Exception as ex:
