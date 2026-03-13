@@ -29,7 +29,8 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["ui", "ui.windows", "data", "data.cache", "data.providers"]
+[tool.setuptools]
+packages = ["ui", "ui.windows", "ui.panels", "ui.widgets", "data", "data.cache", "data.providers"]
 
 [tool.ruff]
 line-length = 100
