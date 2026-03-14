@@ -47,8 +47,6 @@ class WeekendPanel(QWidget):
         self.session_combo = QComboBox()
         self.load_button = QPushButton("Load Session")
 
-        self.session_combo.addItems(["FP1", "FP2", "FP3", "Q", "S", "SQ", "R"])
-
         controls_layout.addRow("Season", self.season_combo)
         controls_layout.addRow("Grand Prix", self.gp_combo)
         controls_layout.addRow("Session", self.session_combo)
@@ -61,20 +59,20 @@ class WeekendPanel(QWidget):
 
         drivers_group = QGroupBox("Driver Comparison")
         drivers_layout = QFormLayout()
-        
+
         self.driver_1_combo = QComboBox()
         self.driver_2_combo = QComboBox()
         self.load_telemetry_button = QPushButton("Load Telemetry")
-        
+
         drivers_layout.addRow("Driver 1", self.driver_1_combo)
         drivers_layout.addRow("Driver 2", self.driver_2_combo)
-        
+
         driver_button_row = QHBoxLayout()
         driver_button_row.addWidget(self.load_telemetry_button)
         drivers_layout.addRow(driver_button_row)
-        
+
         drivers_group.setLayout(drivers_layout)
-        
+
         info_group = QGroupBox("Session Info")
         info_layout = QVBoxLayout()
         self.info_label = QLabel("No session loaded.")
@@ -82,7 +80,7 @@ class WeekendPanel(QWidget):
         self.info_label.setWordWrap(True)
         info_layout.addWidget(self.info_label)
         info_group.setLayout(info_layout)
-        
+
         telemetry_group = QGroupBox("Telemetry")
         telemetry_layout = QVBoxLayout()
         self.telemetry_plot = TelemetryPlotWidget()
@@ -104,24 +102,10 @@ class WeekendPanel(QWidget):
         main_layout.addWidget(laps_group)
 
         self.season_combo.currentIndexChanged.connect(self._on_season_changed)
+        self.gp_combo.currentIndexChanged.connect(self._on_grand_prix_changed)
         self.load_button.clicked.connect(self._on_load_session_clicked)
         self.load_telemetry_button.clicked.connect(self._on_load_telemetry_clicked)
-    
-    def _get_driver_team(self, driver_code: str) -> str | None:
-        if self.current_laps is None or self.current_laps.empty:
-            return None
 
-        drivers_rows = self.current_laps[self.current_laps["Driver"] == driver_code]
-        
-        if drivers_rows.empty or "Team" not in drivers_rows.columns:
-            return None
-        
-        team_value = drivers_rows["Team"].dropna()
-        if team_value.empty:
-            return None
-        
-        return str(team_value.iloc[0])
-        
     def _populate_seasons(self) -> None:
         seasons = [str(year) for year in range(2018, 2026)]
         self.season_combo.addItems(seasons)
@@ -138,9 +122,13 @@ class WeekendPanel(QWidget):
             schedule = self.provider.get_event_schedule(season)
             self.current_schedule = schedule
             self._populate_gp_combo(schedule)
+            self._populate_session_combo_for_selected_gp()
 
         except Exception as ex:
             self._show_error("Failed to load event schedule", str(ex))
+
+    def _on_grand_prix_changed(self) -> None:
+        self._populate_session_combo_for_selected_gp()
 
     def _populate_gp_combo(self, schedule: pd.DataFrame) -> None:
         self.gp_combo.clear()
@@ -161,6 +149,68 @@ class WeekendPanel(QWidget):
 
         values = schedule[event_column].dropna().astype(str).unique().tolist()
         self.gp_combo.addItems(values)
+
+    def _populate_session_combo_for_selected_gp(self) -> None:
+        self.session_combo.clear()
+
+        event_row = self._get_selected_event_row()
+        if event_row is None:
+            return
+
+        available_sessions = []
+
+        for column_name in ["Session1", "Session2", "Session3", "Session4", "Session5"]:
+            if column_name not in event_row.index:
+                continue
+
+            session_full_name = event_row[column_name]
+
+            if pd.isna(session_full_name):
+                continue
+
+            session_code = self._map_session_name_to_code(str(session_full_name))
+            if session_code is not None:
+                available_sessions.append(session_code)
+
+        if available_sessions:
+            self.session_combo.addItems(available_sessions)
+
+    def _get_selected_event_row(self) -> pd.Series | None:
+        if self.current_schedule is None or self.current_schedule.empty:
+            return None
+
+        gp_name = self.gp_combo.currentText()
+        if not gp_name:
+            return None
+
+        possible_columns = ["EventName", "OfficialEventName", "Country", "Location"]
+
+        for column in possible_columns:
+            if column not in self.current_schedule.columns:
+                continue
+
+            matched_rows = self.current_schedule[self.current_schedule[column].astype(str) == gp_name]
+            if not matched_rows.empty:
+                return matched_rows.iloc[0]
+
+        return None
+
+    def _map_session_name_to_code(self, session_name: str) -> str | None:
+        session_name = session_name.strip().lower()
+
+        mapping = {
+            "practice 1": "FP1",
+            "practice 2": "FP2",
+            "practice 3": "FP3",
+            "qualifying": "Q",
+            "race": "R",
+            "sprint": "S",
+            "sprint qualifying": "SQ",
+            "sprint shootout": "SS",
+            "shootout": "SS",
+        }
+
+        return mapping.get(session_name)
 
     def _on_load_session_clicked(self) -> None:
         season_text = self.season_combo.currentText()
@@ -206,7 +256,6 @@ class WeekendPanel(QWidget):
             self.driver_2_combo.setCurrentIndex(1)
 
     def _on_load_telemetry_clicked(self) -> None:
-        print("LOAD TELEMETRY CLICKED")
         if self.current_laps is None or self.current_laps.empty:
             self._show_error("No session loaded", "Load a session before loading telemetry.")
             return
@@ -216,13 +265,7 @@ class WeekendPanel(QWidget):
         session_name = self.session_combo.currentText()
         driver_1 = self.driver_1_combo.currentText()
         driver_2 = self.driver_2_combo.currentText()
-        
-        team_1 = self._get_driver_team(driver_1)
-        team_1_color = get_team_color(team_1)
 
-        team_2 = self._get_driver_team(driver_2) if driver_2 else None
-        team_2_color = get_team_color(team_2) if team_2 else "#FFFFFF"
-        
         if not season_text or not gp_name or not session_name or not driver_1:
             self._show_error("Missing selection", "Please select session and at least one driver.")
             return
@@ -248,14 +291,11 @@ class WeekendPanel(QWidget):
                     lap_number=None,
                 )
 
-            print("Driver 1:", driver_1)
-            print("Telemetry 1 shape:", telemetry_1.shape)
-            print("Telemetry 1 columns:", list(telemetry_1.columns))
+            team_1 = self._get_driver_team(driver_1)
+            team_1_color = get_team_color(team_1)
 
-            if telemetry_2 is not None:
-                print("Driver 2:", driver_2)
-                print("Telemetry 2 shape:", telemetry_2.shape)
-                print("Telemetry 2 columns:", list(telemetry_2.columns))
+            team_2 = self._get_driver_team(driver_2) if driver_2 else None
+            team_2_color = get_team_color(team_2) if team_2 else "#FFFFFF"
 
             self.telemetry_plot.plot_speed_comparison(
                 telemetry_1=telemetry_1,
@@ -269,24 +309,23 @@ class WeekendPanel(QWidget):
         except Exception as ex:
             self._show_error("Failed to load telemetry", str(ex))
 
+    def _get_driver_team(self, driver_code: str) -> str | None:
+        if self.current_laps is None or self.current_laps.empty:
+            return None
 
-    def _load_best_lap_telemetry(
-        self,
-        season: int,
-        grand_prix: str,
-        session_name: str,
-        driver_code: str,
-    ) -> pd.DataFrame:
-        telemetry = self.provider.get_telemetry(
-            season=season,
-            grand_prix=grand_prix,
-            session_name=session_name,
-            driver_code=driver_code,
-            lap_number=None,
-        )
+        if "Driver" not in self.current_laps.columns or "Team" not in self.current_laps.columns:
+            return None
 
-        return telemetry
+        driver_rows = self.current_laps[self.current_laps["Driver"] == driver_code]
 
+        if driver_rows.empty:
+            return None
+
+        team_values = driver_rows["Team"].dropna()
+        if team_values.empty:
+            return None
+
+        return str(team_values.iloc[0])
 
     def _update_session_info(self, metadata: dict, laps: pd.DataFrame) -> None:
         if not metadata:
