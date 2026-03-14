@@ -62,11 +62,17 @@ class WeekendPanel(QWidget):
         drivers_layout = QFormLayout()
 
         self.driver_1_combo = QComboBox()
+        self.lap_1_combo = QComboBox()
+
         self.driver_2_combo = QComboBox()
+        self.lap_2_combo = QComboBox()
+
         self.load_telemetry_button = QPushButton("Load Telemetry")
 
         drivers_layout.addRow("Driver 1", self.driver_1_combo)
+        drivers_layout.addRow("Lap 1", self.lap_1_combo)
         drivers_layout.addRow("Driver 2", self.driver_2_combo)
+        drivers_layout.addRow("Lap 2", self.lap_2_combo)
 
         driver_button_row = QHBoxLayout()
         driver_button_row.addWidget(self.load_telemetry_button)
@@ -106,6 +112,8 @@ class WeekendPanel(QWidget):
         self.gp_combo.currentIndexChanged.connect(self._on_grand_prix_changed)
         self.load_button.clicked.connect(self._on_load_session_clicked)
         self.load_telemetry_button.clicked.connect(self._on_load_telemetry_clicked)
+        self.driver_1_combo.currentIndexChanged.connect(self._on_driver_1_changed)
+        self.driver_2_combo.currentIndexChanged.connect(self._on_driver_2_changed)
 
     def _populate_seasons(self) -> None:
         seasons = [str(year) for year in range(2018, 2026)]
@@ -217,7 +225,7 @@ class WeekendPanel(QWidget):
         }
 
         return mapping.get(normalized, session_name)
-    
+
     def _get_selected_session_value(self) -> str:
         session_label = self.session_combo.currentText()
         if not session_label:
@@ -245,6 +253,8 @@ class WeekendPanel(QWidget):
             self._update_session_info(metadata, laps)
             self._populate_laps_table(laps)
             self._populate_driver_combos(laps)
+            self._on_driver_1_changed()
+            self._on_driver_2_changed()
             self.telemetry_plot.clear_plot()
 
         except Exception as ex:
@@ -268,6 +278,61 @@ class WeekendPanel(QWidget):
         if len(drivers) >= 2:
             self.driver_2_combo.setCurrentIndex(1)
 
+    def _on_driver_1_changed(self) -> None:
+        self._populate_lap_combo_for_driver(self.driver_1_combo, self.lap_1_combo)
+
+    def _on_driver_2_changed(self) -> None:
+        self._populate_lap_combo_for_driver(self.driver_2_combo, self.lap_2_combo)
+
+    def _populate_lap_combo_for_driver(self, driver_combo: QComboBox, lap_combo: QComboBox) -> None:
+        lap_combo.clear()
+
+        if self.current_laps is None or self.current_laps.empty:
+            return
+
+        driver_code = driver_combo.currentText()
+        if not driver_code:
+            return
+
+        if "Driver" not in self.current_laps.columns or "LapNumber" not in self.current_laps.columns:
+            return
+
+        driver_laps = self.current_laps[self.current_laps["Driver"] == driver_code].copy()
+
+        if driver_laps.empty:
+            return
+
+        if "LapTime" in driver_laps.columns:
+            driver_laps = driver_laps.dropna(subset=["LapTime"])
+
+        if driver_laps.empty:
+            return
+
+        lap_numbers = (
+            driver_laps["LapNumber"]
+            .dropna()
+            .astype(int)
+            .sort_values()
+            .unique()
+            .tolist()
+        )
+
+        lap_combo.addItem("Fastest Lap")
+
+        for lap_number in lap_numbers:
+            lap_combo.addItem(str(lap_number))
+
+    def _get_selected_lap_number(self, lap_combo: QComboBox) -> int | None:
+        lap_text = lap_combo.currentText()
+
+        if not lap_text or lap_text == "Fastest Lap":
+            return None
+
+        try:
+            return int(lap_text)
+        except ValueError:
+            return None
+
     def _on_load_telemetry_clicked(self) -> None:
         if self.current_laps is None or self.current_laps.empty:
             self._show_error("No session loaded", "Load a session before loading telemetry.")
@@ -285,13 +350,16 @@ class WeekendPanel(QWidget):
 
         season = int(season_text)
 
+        lap_number_1 = self._get_selected_lap_number(self.lap_1_combo)
+        lap_number_2 = self._get_selected_lap_number(self.lap_2_combo)
+
         try:
             telemetry_1 = self.provider.get_telemetry(
                 season=season,
                 grand_prix=gp_name,
                 session_name=session_name,
                 driver_code=driver_1,
-                lap_number=None,
+                lap_number=lap_number_1,
             )
 
             telemetry_2 = None
@@ -301,7 +369,7 @@ class WeekendPanel(QWidget):
                     grand_prix=gp_name,
                     session_name=session_name,
                     driver_code=driver_2,
-                    lap_number=None,
+                    lap_number=lap_number_2,
                 )
 
             team_1 = self._get_driver_team(driver_1)
@@ -312,10 +380,10 @@ class WeekendPanel(QWidget):
 
             self.telemetry_plot.plot_speed_comparison(
                 telemetry_1=telemetry_1,
-                driver_1=driver_1,
+                driver_1=driver_1 if lap_number_1 is None else f"{driver_1} L{lap_number_1}",
                 team_1_color=team_1_color,
                 telemetry_2=telemetry_2,
-                driver_2=driver_2,
+                driver_2=(driver_2 if lap_number_2 is None else f"{driver_2} L{lap_number_2}") if driver_2 else None,
                 team_2_color=team_2_color,
             )
 
