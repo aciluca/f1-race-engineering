@@ -21,7 +21,6 @@ from data.providers.fastf1_provider import FastF1Provider
 from ui.widgets.telemetry_plot import TelemetryPlotWidget
 from ui.resources import get_team_color
 
-
 class WeekendPanel(QWidget):
     def __init__(self, project_root: Path, cache_manager: CacheManager) -> None:
         super().__init__()
@@ -96,10 +95,23 @@ class WeekendPanel(QWidget):
 
         laps_group = QGroupBox("Laps")
         laps_layout = QVBoxLayout()
+
         self.laps_table = QTableWidget()
         self.laps_table.setColumnCount(0)
         self.laps_table.setRowCount(0)
+        self.laps_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.laps_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+
         laps_layout.addWidget(self.laps_table)
+
+        lap_buttons_row = QHBoxLayout()
+        self.use_lap_for_driver_1_button = QPushButton("Use Selected Lap for Driver 1")
+        self.use_lap_for_driver_2_button = QPushButton("Use Selected Lap for Driver 2")
+
+        lap_buttons_row.addWidget(self.use_lap_for_driver_1_button)
+        lap_buttons_row.addWidget(self.use_lap_for_driver_2_button)
+
+        laps_layout.addLayout(lap_buttons_row)
         laps_group.setLayout(laps_layout)
 
         main_layout.addWidget(controls_group)
@@ -114,6 +126,8 @@ class WeekendPanel(QWidget):
         self.load_telemetry_button.clicked.connect(self._on_load_telemetry_clicked)
         self.driver_1_combo.currentIndexChanged.connect(self._on_driver_1_changed)
         self.driver_2_combo.currentIndexChanged.connect(self._on_driver_2_changed)
+        self.use_lap_for_driver_1_button.clicked.connect(self._use_selected_lap_for_driver_1)
+        self.use_lap_for_driver_2_button.clicked.connect(self._use_selected_lap_for_driver_2)
 
     def _populate_seasons(self) -> None:
         seasons = [str(year) for year in range(2018, 2026)]
@@ -332,6 +346,66 @@ class WeekendPanel(QWidget):
             return int(lap_text)
         except ValueError:
             return None
+
+    def _get_selected_lap_row_data(self) -> dict | None:
+        selected_items = self.laps_table.selectedItems()
+        if not selected_items:
+            return None
+
+        row_index = selected_items[0].row()
+
+        headers = []
+        for col_index in range(self.laps_table.columnCount()):
+            header_item = self.laps_table.horizontalHeaderItem(col_index)
+            headers.append(header_item.text() if header_item is not None else f"Column{col_index}")
+
+        row_data = {}
+        for col_index, column_name in enumerate(headers):
+            item = self.laps_table.item(row_index, col_index)
+            row_data[column_name] = item.text() if item is not None else ""
+
+        return row_data
+
+    def _use_selected_lap_for_driver_1(self) -> None:
+        self._apply_selected_lap_to_driver(
+            target_driver_combo=self.driver_1_combo,
+            target_lap_combo=self.lap_1_combo,
+        )
+
+    def _use_selected_lap_for_driver_2(self) -> None:
+        self._apply_selected_lap_to_driver(
+            target_driver_combo=self.driver_2_combo,
+            target_lap_combo=self.lap_2_combo,
+        )
+
+    def _apply_selected_lap_to_driver(
+        self,
+        target_driver_combo: QComboBox,
+        target_lap_combo: QComboBox,
+    ) -> None:
+        row_data = self._get_selected_lap_row_data()
+
+        if row_data is None:
+            self._show_error("No lap selected", "Please select a lap row from the table first.")
+            return
+
+        driver_code = row_data.get("Driver", "").strip()
+        lap_number = row_data.get("LapNumber", "").strip()
+
+        if not driver_code or not lap_number:
+            self._show_error(
+                "Invalid row selection",
+                "The selected row does not contain Driver and LapNumber values.",
+            )
+            return
+
+        driver_index = target_driver_combo.findText(driver_code)
+        if driver_index >= 0:
+            target_driver_combo.setCurrentIndex(driver_index)
+
+        lap_index = target_lap_combo.findText(lap_number)
+        if lap_index >= 0:
+            target_lap_combo.setCurrentIndex(lap_index)
 
     def _on_load_telemetry_clicked(self) -> None:
         if self.current_laps is None or self.current_laps.empty:
