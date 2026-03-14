@@ -32,6 +32,7 @@ class WeekendPanel(QWidget):
 
         self.current_schedule = None
         self.current_laps = None
+        self.session_name_map = {}
 
         self._build_ui()
         self._populate_seasons()
@@ -152,12 +153,11 @@ class WeekendPanel(QWidget):
 
     def _populate_session_combo_for_selected_gp(self) -> None:
         self.session_combo.clear()
+        self.session_name_map = {}
 
         event_row = self._get_selected_event_row()
         if event_row is None:
             return
-
-        available_sessions = []
 
         for column_name in ["Session1", "Session2", "Session3", "Session4", "Session5"]:
             if column_name not in event_row.index:
@@ -168,12 +168,18 @@ class WeekendPanel(QWidget):
             if pd.isna(session_full_name):
                 continue
 
-            session_code = self._map_session_name_to_code(str(session_full_name))
-            if session_code is not None:
-                available_sessions.append(session_code)
+            session_full_name = str(session_full_name).strip()
 
-        if available_sessions:
-            self.session_combo.addItems(available_sessions)
+            if not session_full_name or session_full_name.lower() in {"none", "nan"}:
+                continue
+
+            session_label = self._map_session_name_to_label(session_full_name)
+
+            if session_label is None:
+                continue
+
+            self.session_combo.addItem(session_label)
+            self.session_name_map[session_label] = session_full_name
 
     def _get_selected_event_row(self) -> pd.Series | None:
         if self.current_schedule is None or self.current_schedule.empty:
@@ -195,8 +201,8 @@ class WeekendPanel(QWidget):
 
         return None
 
-    def _map_session_name_to_code(self, session_name: str) -> str | None:
-        session_name = session_name.strip().lower()
+    def _map_session_name_to_label(self, session_name: str) -> str | None:
+        normalized = session_name.strip().lower()
 
         mapping = {
             "practice 1": "FP1",
@@ -210,12 +216,19 @@ class WeekendPanel(QWidget):
             "shootout": "SS",
         }
 
-        return mapping.get(session_name)
+        return mapping.get(normalized, session_name)
+    
+    def _get_selected_session_value(self) -> str:
+        session_label = self.session_combo.currentText()
+        if not session_label:
+            return ""
+
+        return self.session_name_map.get(session_label, session_label)
 
     def _on_load_session_clicked(self) -> None:
         season_text = self.season_combo.currentText()
         gp_name = self.gp_combo.currentText()
-        session_name = self.session_combo.currentText()
+        session_name = self._get_selected_session_value()
 
         if not season_text or not gp_name or not session_name:
             self._show_error("Missing selection", "Please select season, Grand Prix and session.")
@@ -262,7 +275,7 @@ class WeekendPanel(QWidget):
 
         season_text = self.season_combo.currentText()
         gp_name = self.gp_combo.currentText()
-        session_name = self.session_combo.currentText()
+        session_name = self._get_selected_session_value()
         driver_1 = self.driver_1_combo.currentText()
         driver_2 = self.driver_2_combo.currentText()
 
